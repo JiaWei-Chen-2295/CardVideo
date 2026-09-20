@@ -35,6 +35,17 @@ const check = (label, ok, detail = "") => {
 /** Add a cache-buster: the CDN happily caches a wrong answer under an API path. */
 const bust = (path) => `${BASE}${path}${path.includes("?") ? "&" : "?"}cb=${Date.now()}`;
 
+/**
+ * Is this the homepage document?
+ *
+ * The failure mode being guarded against is silent: a path with no file of its own
+ * resolves to public/index.html and still answers `200 text/html`, so a status check
+ * cannot see it. `index.html` is the only document carrying this heading -- `card.html`
+ * has an empty one and a bare `<title>CardVideo</title>`.
+ */
+const isHomepage = (html) =>
+  /<title>\s*CardVideo\s*·/.test(html) || html.includes("让一张照片播放视频");
+
 async function call(method, path, body) {
   const res = await fetch(bust(path), {
     method,
@@ -140,6 +151,26 @@ for (const path of ["/", "/create", "/selfcheck"]) {
     `got ${res.status} ${res.type || "(none)"}`
   );
 }
+
+// The share link is the whole point of the product, and it is the one dynamic route with
+// no file of its own in public/ -- which is exactly how it silently degraded to the
+// homepage: the static layer fell back to public/index.html before any routing ran.
+console.log("\nthe share link resolves to the card page, not the homepage");
+const shareId = "Pw51V7yKPyyZ"; // shape-valid; whether the card exists is irrelevant here
+const share = await call("GET", `/c/${shareId}`);
+check("GET /c/<id> answers 200 HTML", share.status === 200 && share.type.includes("text/html"), `got ${share.status} ${share.type || "(none)"}`);
+check(
+  "it serves the card page rather than the homepage",
+  !isHomepage(share.text),
+  isHomepage(share.text)
+    ? "this is the homepage -- the /c/ rewrite is missing and the static layer fell back to index.html"
+    : ""
+);
+check(
+  "the card page carries the share-link shell",
+  /id="start"|开始体验|card\.js/.test(share.text),
+  "the served document does not look like card.html"
+);
 
 console.log(
   failures === 0

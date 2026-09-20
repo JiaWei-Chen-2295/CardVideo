@@ -8,6 +8,10 @@
     {
       "source": "/api/:path*",
       "destination": "/api"
+    },
+    {
+      "source": "/c/:path*",
+      "destination": "/card.html"
     }
   ],
   "headers": [

@@ -110,18 +110,54 @@ if (existsSync("api/index.js")) {
   );
 }
 
-// The rewrite is what attaches the handler to /api/*. Without it the file is present but
-// nothing routes to it -- which reproduces the exact production failure.
+// The rewrites are what attach paths to the handler and to the share-link document.
+// Without them the files are present but nothing routes to them -- and because the
+// static layer falls back to public/index.html, the failure looks like "every page
+// silently returns the homepage" rather than an error.
 try {
   const config = JSON.parse(readFileSync("vercel.json", "utf8"));
-  const rewrite = (config.rewrites ?? []).find((r) => /^\/api\//.test(r.source));
+  const rewrites = config.rewrites ?? [];
+
+  const api = rewrites.find((r) => /^\/api\//.test(r.source));
   check(
     "vercel.json rewrites /api/* onto the handler",
-    Boolean(rewrite),
-    rewrite ? `${rewrite.source} -> ${rewrite.destination}` : "no rewrite matches /api/"
+    Boolean(api),
+    api ? `${api.source} -> ${api.destination}` : "no rewrite matches /api/"
   );
+
+  // The share link is NOT routed to the function: card.html is a static document and the
+  // card id is read client-side from location.pathname. Verified below against the real
+  // file, so the destination cannot silently stop existing.
+  const share = rewrites.find((r) => /^\/c\//.test(r.source));
+  check(
+    "vercel.json rewrites /c/* onto the share-link document",
+    Boolean(share),
+    share ? `${share.source} -> ${share.destination}` : "no rewrite matches /c/"
+  );
+  if (share) {
+    const target = share.destination.replace(/^\//, "");
+    check(
+      `the share-link rewrite target exists -- ${target}`,
+      existsSync(`public/${target}`),
+      "the rewrite would 404 at the static layer and fall back to the homepage"
+    );
+  }
 } catch (err) {
   check("vercel.json is readable JSON", false, err.message);
+}
+
+// The client reads the card id straight out of the path, so the rewrite must preserve a
+// /c/<id> shaped URL rather than rewriting it to /card.html in the address bar. If that
+// ever changes to a redirect, every share link breaks. Assert the parser's contract.
+try {
+  const cardJs = readFileSync("public/js/card.js", "utf8");
+  check(
+    "card.js derives the card id from the URL path",
+    /location\.pathname/.test(cardJs),
+    "if this changes, the /c/ rewrite destination must be revisited"
+  );
+} catch (err) {
+  check("public/js/card.js is readable", false, err.message);
 }
 
 // The re-export must not be a second construction: two Express instances would mean two copies of
