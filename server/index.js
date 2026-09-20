@@ -234,7 +234,15 @@ app.use(express.static(publicDir, {
 
 // Share-link landing page. The page fetches /api/cards/:id itself, so this is a static
 // shell that also survives being hit directly on a cold CDN.
+//
+// WHY BOTH PATHS. On Vercel the share link is reached through a rewrite, and whether the
+// platform forwards the original path (`/c/<id>`) or the destination path (`/api/...`)
+// is not something this project can rely on: `vercel.json` cannot repeat the same
+// wildcard in the destination reliably, so the rewrite points at `/api` and the handler
+// decides. Serving the card page on both forms means the share link works either way,
+// instead of depending on a routing detail that cannot be tested locally.
 app.get("/c/:id", (req, res) => sendPage(res, "card.html"));
+app.get("/api/c/:id", (req, res) => sendPage(res, "card.html"));
 
 // The AR session and creator pages. These are also reachable as plain .html files via the
 // static middleware above; the extensionless routes exist so share links stay short.

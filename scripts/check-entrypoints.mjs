@@ -125,25 +125,41 @@ try {
     api ? `${api.source} -> ${api.destination}` : "no rewrite matches /api/"
   );
 
-  // The share link is NOT routed to the function: card.html is a static document and the
-  // card id is read client-side from location.pathname. Verified below against the real
-  // file, so the destination cannot silently stop existing.
+  // The share link goes through the FUNCTION, not to the static card.html. Rewriting to
+  // `/card.html` was tried and silently did nothing: with `cleanUrls: true` that path is a
+  // redirect (`308 -> /card`), so the rewrite was not honoured and /c/<id> kept falling
+  // back to public/index.html -- answering 200 text/html with the wrong page.
   const share = rewrites.find((r) => /^\/c\//.test(r.source));
   check(
-    "vercel.json rewrites /c/* onto the share-link document",
+    "vercel.json rewrites /c/* onto the handler",
     Boolean(share),
     share ? `${share.source} -> ${share.destination}` : "no rewrite matches /c/"
   );
   if (share) {
-    const target = share.destination.replace(/^\//, "");
     check(
-      `the share-link rewrite target exists -- ${target}`,
-      existsSync(`public/${target}`),
-      "the rewrite would 404 at the static layer and fall back to the homepage"
+      "the share-link rewrite avoids .html destinations",
+      !share.destination.endsWith(".html"),
+      "cleanUrls turns .html destinations into redirects, which makes the rewrite a no-op"
     );
   }
 } catch (err) {
   check("vercel.json is readable JSON", false, err.message);
+}
+
+// The share link must be served whether the platform forwards the original path or the
+// rewrite destination, so the app registers it on both. Assert the routes exist rather
+// than trusting that they stay in step.
+try {
+  const serverJs = readFileSync("server/index.js", "utf8");
+  for (const route of ["/c/:id", "/api/c/:id"]) {
+    check(
+      `server/index.js serves the card page on ${route}`,
+      serverJs.includes(`app.get("${route}"`),
+      "the share link would 404 for whichever path shape the rewrite forwards"
+    );
+  }
+} catch (err) {
+  check("server/index.js is readable", false, err.message);
 }
 
 // The client reads the card id straight out of the path, so the rewrite must preserve a
@@ -224,6 +240,24 @@ if (apiHandler) {
       `${method} ${path} reaches the API`,
       type.includes("application/json"),
       `ct=${type || "(none)"} status=${res.status}`
+    );
+  }
+
+  // The share link must serve the card document on BOTH path shapes, because whether the
+  // rewrite forwards the original path or the destination is not something this project
+  // can rely on. Every wrong answer here is still a 200, so compare the document.
+  for (const path of ["/c/Pw51V7yKPyyZ", "/api/c/Pw51V7yKPyyZ"]) {
+    const res = await fetch(base + path);
+    const html = await res.text();
+    const type = res.headers.get("content-type") ?? "";
+    const isCard = type.includes("text/html") && html.includes("/js/card.js");
+    const isHomepage = /<title>\s*CardVideo\s*·/.test(html);
+    check(
+      `GET ${path} serves the card page`,
+      isCard && !isHomepage,
+      isHomepage
+        ? "this is the homepage -- the share link fell through to public/index.html"
+        : `ct=${type || "(none)"} status=${res.status}`
     );
   }
 

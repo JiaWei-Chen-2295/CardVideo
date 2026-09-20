@@ -11,7 +11,7 @@
     },
     {
       "source": "/c/:path*",
-      "destination": "/card.html"
+      "destination": "/api"
     }
   ],
   "headers": [
