@@ -4,6 +4,12 @@
   "installCommand": "npm install --ignore-scripts",
   "buildCommand": "node scripts/sync-vendor.mjs",
   "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api"
+    }
+  ],
   "headers": [
     {
       "source": "/vendor/(.*)",

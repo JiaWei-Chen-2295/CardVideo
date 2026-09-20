@@ -6,13 +6,24 @@
 // point produces a deployment that builds cleanly and then 404s on every route, with no build error
 // to explain it.
 //
-// This checks both the detection locations and the two entry points this project ships
-// (`server.js` at the root for the platform, `server/index.js` for local runs), and confirms both
-// export the SAME application rather than two independent constructions.
+// WHY THERE IS ALSO AN api/ ENTRY POINT
+// The root `server.js` above turned out NOT to be enough. Measured on the live deployment, the app
+// was never invoked at all: `GET /api/health` answered `200 text/html` with the homepage document
+// instead of JSON, every unknown path answered the homepage, and `POST` to any `/api/*` path was
+// rejected `405` by the static layer. The deployment had gone out as a pure static bundle with the
+// whole API unreachable and no build error to say so.
+//
+// `api/` is the one directory Vercel treats as serverless functions without having to infer a
+// framework. So the handler lives there, and `vercel.json` rewrites `/api/:path*` onto it. Because
+// it is not documented whether that rewrite preserves or strips the `/api` prefix, `api/index.js`
+// normalises both, and this script proves both shapes reach the API.
+//
+// This checks the detection locations, all three entry points, that they resolve to the SAME
+// application rather than independent constructions, and that the rewrite contract holds.
 //
 // usage: node --env-file=.env scripts/check-entrypoints.mjs
 
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
 let failures = 0;
 const check = (label, ok, detail = "") => {
@@ -80,6 +91,39 @@ try {
   check("server/index.js imports", false, err.message);
 }
 
+console.log("\nthe api/ handler Vercel actually runs");
+let apiHandler = null;
+if (existsSync("api/index.js")) {
+  try {
+    const module = await import("../api/index.js");
+    apiHandler = module.default;
+    check("api/index.js imports", true);
+    check("api/index.js default-exports a handler function", typeof apiHandler === "function", typeof apiHandler);
+  } catch (err) {
+    check("api/index.js imports", false, err.message);
+  }
+} else {
+  check(
+    "api/index.js exists",
+    false,
+    "without it the deployment serves the api/ paths as static files and the whole API is unreachable"
+  );
+}
+
+// The rewrite is what attaches the handler to /api/*. Without it the file is present but
+// nothing routes to it -- which reproduces the exact production failure.
+try {
+  const config = JSON.parse(readFileSync("vercel.json", "utf8"));
+  const rewrite = (config.rewrites ?? []).find((r) => /^\/api\//.test(r.source));
+  check(
+    "vercel.json rewrites /api/* onto the handler",
+    Boolean(rewrite),
+    rewrite ? `${rewrite.source} -> ${rewrite.destination}` : "no rewrite matches /api/"
+  );
+} catch (err) {
+  check("vercel.json is readable JSON", false, err.message);
+}
+
 // The re-export must not be a second construction: two Express instances would mean two copies of
 // every route, and any state they hold (config, adapters) would diverge.
 if (rootApp && localApp) {
@@ -108,6 +152,43 @@ if (rootApp) {
   ]) {
     const res = await fetch(base + path);
     check(`GET ${path}`, res.status === expected, `expected ${expected}, got ${res.status}`);
+  }
+
+  await new Promise((resolve) => server.close(resolve));
+}
+
+// The regression that took the live site down: the handler existed but the API was
+// unreachable. Since the rewrite may hand over either URL shape, both are asserted, and
+// every one of them must answer JSON -- `text/html` is precisely how the failure looked.
+console.log("\nthe api/ handler reaches the API for both rewrite shapes");
+if (apiHandler) {
+  const { createServer } = await import("node:http");
+  const server = createServer(apiHandler);
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  for (const [method, path] of [
+    ["GET", "/api/health"],
+    ["GET", "/health"],
+    ["GET", "/api/cards/000000000000"],
+    ["GET", "/cards/000000000000"],
+    ["POST", "/api/upload-ticket"],
+    ["POST", "/upload-ticket"],
+    ["POST", "/api/cards"],
+    ["POST", "/cards"],
+  ]) {
+    const res = await fetch(base + path, {
+      method,
+      ...(method === "POST"
+        ? { headers: { "content-type": "application/json" }, body: "{}" }
+        : {}),
+    });
+    const type = res.headers.get("content-type") ?? "";
+    check(
+      `${method} ${path} reaches the API`,
+      type.includes("application/json"),
+      `ct=${type || "(none)"} status=${res.status}`
+    );
   }
 
   await new Promise((resolve) => server.close(resolve));
