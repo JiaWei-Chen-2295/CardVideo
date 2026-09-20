@@ -159,17 +159,19 @@ console.log("\nthe share link resolves to the card page, not the homepage");
 const shareId = "Pw51V7yKPyyZ"; // shape-valid; whether the card exists is irrelevant here
 const share = await call("GET", `/c/${shareId}`);
 check("GET /c/<id> answers 200 HTML", share.status === 200 && share.type.includes("text/html"), `got ${share.status} ${share.type || "(none)"}`);
+const shareIsHomepage = isHomepage(share.text);
 check(
   "it serves the card page rather than the homepage",
-  !isHomepage(share.text),
-  isHomepage(share.text)
+  !shareIsHomepage,
+  shareIsHomepage
     ? "this is the homepage -- the /c/ rewrite is missing and the static layer fell back to index.html"
-    : ""
+    : `served ${share.text.length} bytes of the card document`
 );
+const looksLikeCardShell = /id="start"|开始体验|card\.js/.test(share.text);
 check(
   "the card page carries the share-link shell",
-  /id="start"|开始体验|card\.js/.test(share.text),
-  "the served document does not look like card.html"
+  looksLikeCardShell,
+  looksLikeCardShell ? "found the start control / card.js reference" : "the served document does not look like card.html"
 );
 
 console.log(

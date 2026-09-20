@@ -207,10 +207,54 @@ npm run check:live        # 默认 https://card.javierchen.cn，也可 npm run c
 
 ```
 api/index.js          ← default export 一个 (req, res) handler，转发给 Express app
-vercel.json           ← rewrites: /api/:path* -> /api
+vercel.json           ← rewrites: /api/:path* -> /api, /c/:path* -> /api
 ```
 
 `api/index.js` 会**归一化路径**，因为重写过来时 `/api` 前缀是保留还是被剥掉没有明确文档。两种形态都必须能命中，`check:entrypoints` 对两种都做了断言。
+
+### ⚠️ `cleanUrls` 会让指向 `.html` 的重写静默失效
+
+分享链接 `/c/<id>` **也踩过一次**，症状同样是"没有报错但页面是错的"：
+
+```
+GET /c/<id>  →  200 text/html  ← 但返回的是首页文档
+```
+
+`/c/<id>` 在 `public/` 下**没有对应文件**，所以静态层兜底到 `public/index.html`，返回 200 加首页，**永远不会报错**。
+
+第一反应是把 `/c/*` 重写到静态的 `card.html`：
+
+```jsonc
+{ "source": "/c/:path*", "destination": "/card.html" }   // ❌ 完全无效
+```
+
+**这条重写被静默忽略了。** 因为本项目开了 `cleanUrls: true`，而在该设置下 `/card.html` 是一个**被重定向的路径**——直接请求它得到：
+
+```
+GET /card.html  →  308  Redirecting...  Location: /card
+GET /card       →  200  ✅ 卡片页
+```
+
+所以在这次部署里，`.html` 路径**只能作为文件存在，不能作为重写的目标**。正确做法是让 `/c/*` 走函数（目标不是 HTML 路径，就绕开了 `cleanUrls`）：
+
+```jsonc
+{ "source": "/c/:path*", "destination": "/api" }
+```
+
+**另外，函数收到的路径形态无法在本地验证**（重写是保留原路径还是只给通配符剩余部分，没有可靠文档）。所以不再赌它：卡片页**同时注册在两条路径上**——
+
+```js
+app.get("/c/:id", ...)        // 保留原路径时命中
+app.get("/api/c/:id", ...)    // 只给剩余部分时，归一化后命中
+```
+
+这样无论平台怎么转发，分享链接都能work。
+
+**规律总结**（这次排查得到的最有用的一条）：
+
+> **Vercel 先做静态文件解析。命中文件就不往下走；没命中也不会 404，而是兜底到 `public/index.html`。只有带显式 `rewrites` 的路径才会交给函数。**
+
+所以每个"没有对应静态文件"的动态路由，都必须在 `vercel.json` 里有自己的重写，否则它会**安静地变成首页**。
 
 > 这也解释了你最初看到的那条报错：`The pattern "server/index.js" defined in functions doesn't match any Serverless Functions inside the api directory` —— Vercel 的 `functions` 只认 `api/` 目录。当时我删掉了 `functions` 块，但**没有把文件放进 `api/`**，等于只解决了一半。
 
