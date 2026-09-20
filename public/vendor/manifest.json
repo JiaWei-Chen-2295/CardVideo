@@ -1,0 +1,17 @@
+{
+  "generatedAt": "2026-09-20T05:20:05.608Z",
+  "artifacts": [
+    {
+      "path": "vendor/three.module.js",
+      "note": "Three.js core, ESM build"
+    },
+    {
+      "path": "vendor/three-addons/BufferGeometryUtils.js",
+      "note": "optional addon used by some mind-ar helpers"
+    },
+    {
+      "path": "vendor/mindar-image-three.prod.js",
+      "note": "MindAR image tracking + Three.js integration"
+    }
+  ]
+}

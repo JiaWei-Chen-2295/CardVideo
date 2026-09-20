@@ -1,0 +1,222 @@
+/* The AR view.
+ *
+ * The camera feed is the background, so this file is about staying out of its way: a
+ * full-bleed stage, one legible hint, and the smallest possible exit affordance
+ * (DESIGN.md P5, P7). */
+
+.ar-stage {
+  position: fixed;
+  inset: 0;
+  background: #000;
+  overflow: hidden;
+  touch-action: none;
+}
+
+/* mind-ar injects the camera <video> and two canvases (WebGL + CSS3D) into the stage.
+ * None of them may swallow pointer events: the exit and sound controls sit on top. */
+.ar-stage video,
+.ar-stage canvas {
+  pointer-events: none !important;
+}
+
+/* The CSS3D layer is only used for mind-ar's optional DOM anchors, which this project
+ * does not use. Hiding it avoids an invisible full-screen layer over the camera. */
+.ar-stage > div:empty {
+  display: none;
+}
+
+/* --------------------------------------------------------------------- chrome */
+
+.ar-chrome {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.ar-chrome > * {
+  pointer-events: auto;
+}
+
+/* Exit control: deliberately tiny and low-contrast so it never competes with the video,
+ * but with a generous invisible tap target (44px) for fat fingers. */
+.ar-exit {
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  right: max(10px, env(safe-area-inset-right));
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.ar-exit::before {
+  content: "";
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(8, 10, 15, 0.42);
+  backdrop-filter: blur(6px);
+}
+
+.ar-exit span {
+  position: relative;
+  font-size: 15px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.ar-exit:hover::before {
+  background: rgba(8, 10, 15, 0.6);
+}
+
+/* Bottom hint. Uses a fixed slot so messages never cause the layout to jump. */
+.ar-hint {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: max(28px, calc(env(safe-area-inset-bottom) + 20px));
+  max-width: min(88vw, 420px);
+  padding: 11px 18px;
+  border-radius: 999px;
+  background: rgba(8, 10, 15, 0.62);
+  backdrop-filter: blur(10px);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: center;
+  transition: opacity 0.25s ease;
+}
+
+.ar-hint[hidden] {
+  display: none;
+}
+
+.ar-hint--soft {
+  background: rgba(8, 10, 15, 0.42);
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 13px;
+}
+
+/* Sound control, revealed only once something is actually on screen. */
+.ar-sound {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: max(84px, calc(env(safe-area-inset-bottom) + 76px));
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(8, 10, 15, 0.66);
+  backdrop-filter: blur(10px);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  animation: ar-sound-in 0.3s ease both;
+}
+
+.ar-sound[hidden] {
+  display: none;
+}
+
+.ar-sound:hover {
+  background: rgba(8, 10, 15, 0.8);
+}
+
+@keyframes ar-sound-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+/* ------------------------------------------------------------------ overlays */
+
+.ar-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(circle at 50% 40%, #131a26 0%, #06080c 100%);
+  text-align: center;
+}
+
+.ar-overlay[hidden] {
+  display: none;
+}
+
+.ar-overlay__inner {
+  max-width: 380px;
+  width: 100%;
+}
+
+.ar-overlay h1 {
+  font-size: 21px;
+  margin-bottom: 10px;
+}
+
+.ar-overlay p {
+  font-size: 14.5px;
+}
+
+.ar-overlay .btn {
+  margin-top: 6px;
+}
+
+.ar-steps {
+  list-style: none;
+  margin: 14px 0 18px;
+  padding: 0;
+  text-align: left;
+  font-size: 14px;
+  color: var(--text-dim);
+}
+
+.ar-steps li {
+  padding: 7px 0 7px 26px;
+  position: relative;
+  line-height: 1.5;
+}
+
+.ar-steps li::before {
+  content: attr(data-n);
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(76, 141, 255, 0.16);
+  color: #9dc0ff;
+  font-size: 11px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+}
+
+.ar-spinner-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-dim);
+  font-size: 14px;
+  min-height: 24px;
+}

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#080a0f" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>创建卡片 · CardVideo</title>
+    <link rel="stylesheet" href="/css/base.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/vendor/three.shim.js",
+          "three/addons/": "/vendor/three-addons/",
+          "mindar-image-three": "/vendor/mindar-image-three.prod.js",
+          "mindar-image-compile": "/vendor/mindar-image-compile.js"
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <div class="topbar">
+      <a class="brand" href="/">Card<span>Video</span></a>
+      <span class="hint">照片即卡片</span>
+    </div>
+
+    <main class="wrap">
+      <h1>创建一张会播放视频的照片</h1>
+      <p>
+        上传一张照片和一段视频，生成一个链接。把链接和<strong>打印出来的照片</strong>发给朋友，
+        他用手机摄像头对准照片，照片上就会升起一块屏幕播放视频。
+      </p>
+
+      <form id="form" class="panel" novalidate>
+        <div class="field">
+          <label class="label" for="photo">① 照片（将作为识别目标）</label>
+          <input id="photo" type="file" accept="image/png,image/jpeg,image/webp" required />
+          <p class="hint" style="margin-top: 7px">
+            细节丰富的照片最可靠：带文字、花纹、树叶、砖墙的都很好。纯色、大面积渐变、
+            强烈虚化的照片无法被识别，会被拦下来。
+          </p>
+        </div>
+
+        <div class="field">
+          <label class="label" for="video">② 视频（MP4 / H.264）</label>
+          <input id="video" type="file" accept="video/mp4,video/x-m4v" required />
+          <p class="hint" style="margin-top: 7px">
+            iPhone 默认录制的 HEVC 格式在部分安卓浏览器上会黑屏，请用「高效」以外的格式导出，
+            或先用剪映等工具导出 MP4（H.264）。v1 不做转码，所以格式不对会被拒绝。
+          </p>
+        </div>
+
+        <div class="field">
+          <label class="label" for="title">③ 标题（可选）</label>
+          <input id="title" type="text" maxlength="60" placeholder="例如：给妈妈的生日祝福" />
+        </div>
+
+        <div id="status" class="notice" hidden></div>
+
+        <ol id="steps" class="steps">
+          <li class="step" data-step="video">
+            <span class="step__dot"></span><span>检查视频格式（H.264 / MP4）</span>
+          </li>
+          <li class="step" data-step="photo">
+            <span class="step__dot"></span><span>预检照片是否适合做识别目标</span>
+          </li>
+          <li class="step" data-step="compile">
+            <span class="step__dot"></span><span>生成追踪数据（几秒）</span>
+          </li>
+          <li class="step" data-step="upload">
+            <span class="step__dot"></span><span>上传照片、视频与追踪数据</span>
+          </li>
+        </ol>
+
+        <div id="progress" class="progress" hidden>
+          <div id="bar" class="progress__bar"></div>
+        </div>
+        <p id="progress-label" class="hint" style="margin: 4px 0 12px"></p>
+
+        <button id="submit" class="btn" type="submit"><span>生成分享链接</span></button>
+      </form>
+
+      <section id="result" class="panel" hidden>
+        <h2 style="font-size: 17px">卡片已生成</h2>
+        <div class="field">
+          <label class="label" for="share-url">分享链接</label>
+          <input id="share-url" type="text" readonly />
+        </div>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px">
+          <button id="copy" class="btn btn--ghost btn--sm" type="button">复制</button>
+          <a id="selfcheck" class="btn btn--sm" href="#" style="width: auto">用我的手机自检一次</a>
+        </div>
+
+        <div class="notice notice--warn">
+          <strong>发给朋友之前，请先自检。</strong>
+          用你的手机打开自检页面，对着<strong>打印出来的照片</strong>拍一下，
+          确认屏幕能升起来。识别失败最常见的原因是没打印、光线太暗、或者距离太远。
+        </div>
+
+        <div id="manage" class="panel panel--tight" style="margin: 0">
+          <p id="manage-note" class="hint" style="margin-bottom: 10px">
+            这个链接不可猜测。如果不小心上传了不该传的内容，可以在这里删除。
+          </p>
+          <button id="delete-card" class="btn btn--danger btn--sm" type="button" hidden>
+            删除这张卡片
+          </button>
+        </div>
+
+        <button id="reset" class="btn btn--ghost" type="button" style="margin-top: 14px">
+          再创建一张
+        </button>
+      </section>
+    </main>
+
+    <script type="module" src="/js/create.js"></script>
+  </body>
+</html>

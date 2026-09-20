@@ -1,0 +1,36 @@
+# dependencies
+node_modules/
+
+# local runtime data: uploaded media, card metadata, generated fixtures, dev TLS certificate
+data/
+
+# npm cache pinned into the workspace by .npmrc (the machine default sits outside
+# the sandbox and causes EPERM -- see DESIGN.md §7)
+.npm-cache/
+
+# scratch experiments from the design phase
+scratch/
+
+# environment
+#
+# `.env` holds cloud credentials (Qiniu access keys, a Turso auth token) and must never be
+# committed. `.env.example` is the opposite: it is a template with empty values and IS tracked.
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# TLS material. The dev certificate lives under data/ and is already covered, but a stray
+# certificate or key created elsewhere must never enter the repository either.
+*.pem
+*.key
+*.p12
+*.pfx
+
+# vercel
+.vercel
+
+# os / editor noise
+.DS_Store
+Thumbs.db
+*.log

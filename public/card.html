@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#080a0f" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>CardVideo</title>
+    <link rel="stylesheet" href="/css/base.css" />
+    <!--
+      This page's own script uses no bare specifiers today, but the import map is declared
+      anyway: card.js is a sibling of the AR entry points, and a future `import "three"` here
+      would otherwise fail with an unresolved specifier and no obvious cause.
+    -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/vendor/three.shim.js",
+          "three/addons/": "/vendor/three-addons/",
+          "mindar-image-three": "/vendor/mindar-image-three.prod.js",
+          "mindar-image-compile": "/vendor/mindar-image-compile.js"
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <div class="topbar">
+      <a class="brand" href="/">Card<span>Video</span></a>
+      <a class="hint" href="/create">创建卡片</a>
+    </div>
+
+    <main class="wrap wrap--narrow">
+      <div id="loading" class="panel">
+        <div class="ar-spinner-row"><div class="spinner" aria-hidden="true"></div></div>
+      </div>
+
+      <div id="error" class="notice notice--error" hidden></div>
+
+      <section id="card" hidden>
+        <h1 id="card-title" style="font-size: 20px"></h1>
+        <img id="card-photo" class="thumb" alt="卡片照片" />
+
+        <div class="panel" style="margin-top: 16px">
+          <p style="margin-bottom: 14px">
+            这是一张 AR 卡片。点击下面的按钮，把摄像头对准<strong>打印出来的这张照片</strong>，
+            照片上会升起一块屏幕播放视频。
+          </p>
+
+          <ul class="ar-steps">
+            <li data-n="1">把这张照片<strong>打印出来</strong>（建议 A4 彩打，短边至少 10cm）</li>
+            <li data-n="2">光线充足，避免反光</li>
+            <li data-n="3">手机对准照片，距离 25–45cm</li>
+          </ul>
+
+          <a id="start" class="btn" href="#">开始体验</a>
+        </div>
+
+        <div class="panel panel--tight">
+          <p class="hint" style="margin: 0">
+            识别不了？先确认照片是打印出来的（对着手机屏幕里的照片拍通常不成功，反光和摩尔纹
+            会干扰识别），再把手机靠近一些、换个角度，或把灯打开。
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/js/card.js"></script>
+  </body>
+</html>

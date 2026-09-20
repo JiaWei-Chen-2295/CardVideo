@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#080a0f" />
+    <meta
+      name="description"
+      content="上传一张照片和一段视频，朋友用手机对着打印出来的照片拍摄，照片上就会升起一块 3D 屏幕播放视频。"
+    />
+    <title>CardVideo · 让照片播放视频</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <!--
+      No script on this page needs it yet. Declared for the same reason as on card.html:
+      every page in this project shares module code, so the import map is kept consistent
+      across pages rather than added reactively when something breaks.
+    -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/vendor/three.shim.js",
+          "three/addons/": "/vendor/three-addons/",
+          "mindar-image-three": "/vendor/mindar-image-three.prod.js",
+          "mindar-image-compile": "/vendor/mindar-image-compile.js"
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <div class="topbar">
+      <span class="brand">Card<span>Video</span></span>
+      <a class="hint" href="/create">创建卡片</a>
+    </div>
+
+    <main class="wrap wrap--narrow">
+      <h1>让一张照片播放视频</h1>
+      <p>
+        上传一张照片和一段视频，会得到一个链接。把链接和<strong>打印出来的照片</strong>
+        一起发给朋友，他用手机摄像头对准照片，照片上就会升起一块屏幕播放那段视频。
+      </p>
+
+      <div class="panel">
+        <ul class="ar-steps">
+          <li data-n="1"><strong>你</strong>上传一张照片和一段视频</li>
+          <li data-n="2"><strong>你</strong>把照片打印出来，连同链接一起给对方</li>
+          <li data-n="3"><strong>对方</strong>打开链接，用摄像头对准照片</li>
+          <li data-n="4">照片上<strong>升起一块屏幕</strong>，开始播放视频</li>
+        </ul>
+        <a class="btn" href="/create">创建一张卡片</a>
+      </div>
+
+      <div class="panel panel--tight">
+        <h2 style="font-size: 15px; margin-bottom: 8px">为什么必须打印出来？</h2>
+        <p class="hint" style="margin: 0">
+          识别依赖照片上的纹理特征。对着手机或显示器上的照片拍，会因为<strong>反光、
+          摩尔纹和视角畸变</strong>导致识别失败，这是这类技术的物理限制，不是设置问题。
+          打印建议用 A4 纸彩打，照片短边至少 10cm。
+        </p>
+      </div>
+
+      <div class="panel panel--tight">
+        <h2 style="font-size: 15px; margin-bottom: 8px">什么样的照片能识别？</h2>
+        <p class="hint" style="margin: 0">
+          <strong>能识别</strong>：带文字的海报、风景照、树叶花草、砖墙、书架、有花纹的织物。<br />
+          <strong>不能识别</strong>：纯色背景、大面积天空或渐变、严重虚化的人像特写、证件照。
+        </p>
+      </div>
+
+      <p class="hint" style="margin-top: 20px">
+        技术实现：浏览器端 <a href="https://github.com/hiukim/mind-ar-js">MindAR</a> 图像追踪 +
+        Three.js 渲染，追踪数据在你的设备上本地生成，视频由你自己的存储托管。
+      </p>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,6 @@
+{
+  "imports": {
+    "three": "/vendor/three.shim.js",
+    "three/addons/": "/vendor/three-addons/"
+  }
+}

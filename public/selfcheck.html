@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#080a0f" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>自检 · CardVideo</title>
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/ar.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/vendor/three.shim.js",
+          "three/addons/": "/vendor/three-addons/",
+          "mindar-image-three": "/vendor/mindar-image-three.prod.js",
+          "mindar-image-compile": "/vendor/mindar-image-compile.js"
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <!--
+      The AR session runs IN this page. See the note at the top of /js/selfcheck.js for why:
+      the earlier two-page flow parked the whole video in IndexedDB to move it across a
+      navigation, which broke on a real phone.
+    -->
+
+    <div id="stage" class="ar-stage" hidden></div>
+
+    <div id="chrome" class="ar-chrome" hidden>
+      <button id="exit" class="ar-exit" type="button" aria-label="结束自检">
+        <span aria-hidden="true">✕</span>
+      </button>
+      <button id="sound" class="ar-sound" type="button" hidden>
+        <span aria-hidden="true">🔊</span>
+        <span>开启声音</span>
+      </button>
+      <div id="hint" class="ar-hint ar-hint--soft" hidden role="status" aria-live="polite"></div>
+    </div>
+
+    <div id="intro">
+      <div class="topbar">
+        <a class="brand" href="/">Card<span>Video</span></a>
+        <span class="hint">本地自检 · 不上传</span>
+      </div>
+
+      <main class="wrap wrap--narrow">
+        <h1>先自己扫一遍</h1>
+        <p>
+          选同一张照片和同一段视频，页面会在你的手机里<strong>本地生成追踪数据</strong>并直接打开 AR。
+          整个过程不会上传任何文件，用来确认这张照片在你手上真的能被识别。
+        </p>
+
+        <form id="form" class="panel" novalidate>
+          <div class="field">
+            <label class="label" for="photo">照片（要和卡片用的是同一张）</label>
+            <input id="photo" type="file" accept="image/png,image/jpeg,image/webp" required />
+          </div>
+          <div class="field">
+            <label class="label" for="video">视频（要和卡片用的是同一段）</label>
+            <input id="video" type="file" accept="video/mp4,video/x-m4v" required />
+            <p class="hint" style="margin-top: 7px">
+              同一段视频才能验证真实效果；AR 里屏幕的尺寸和比例都由它决定。
+            </p>
+          </div>
+
+          <div id="status" class="notice" hidden></div>
+          <div id="progress" class="progress" hidden>
+            <div id="bar" class="progress__bar"></div>
+          </div>
+          <p id="progress-label" class="hint" style="margin: 4px 0 12px"></p>
+
+          <button id="submit" class="btn" type="submit"><span>生成并打开 AR 自检</span></button>
+        </form>
+
+        <div class="panel panel--tight">
+          <p class="hint" style="margin: 0">
+            注意：必须对着<strong>打印出来的照片</strong>拍。对着另一块屏幕上的照片拍，
+            会因为反光、摩尔纹和视角畸变而识别失败——这不是你操作的问题，是这个技术的物理限制。
+          </p>
+        </div>
+      </main>
+    </div>
+
+    <script type="module" src="/js/selfcheck.js"></script>
+  </body>
+</html>

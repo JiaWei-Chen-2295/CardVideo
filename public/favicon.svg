@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="CardVideo">
+  <!--
+    CardVideo mark: a screen rising off a card.
+    Inline SVG so there is no binary asset to maintain and no extra request format to worry
+    about; every target browser supports it as a favicon.
+  -->
+  <rect width="64" height="64" rx="14" fill="#0f1420" />
+  <rect x="8" y="10" width="48" height="34" rx="4" fill="#161c28" stroke="#262d3a" stroke-width="2" />
+  <rect x="14" y="17" width="36" height="22" rx="3" fill="none" stroke="#4c8dff" stroke-width="3" />
+  <path d="M28 22.5v11l10-5.5z" fill="#4c8dff" />
+  <rect x="20" y="50" width="24" height="3.5" rx="1.75" fill="#2a3444" />
+</svg>

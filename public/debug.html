@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>诊断 · CardVideo</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/css/base.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/vendor/three.shim.js",
+          "three/addons/": "/vendor/three-addons/",
+          "mindar-image-three": "/vendor/mindar-image-three.prod.js",
+          "mindar-image-compile": "/vendor/mindar-image-compile.js"
+        }
+      }
+    </script>
+  </head>
+
+  <body>
+    <div class="topbar"><span class="brand">Card<span>Video</span></span><span class="hint">诊断</span></div>
+    <main class="wrap">
+      <h1>运行时诊断</h1>
+      <p>
+        这个页面验证浏览器端最容易出问题的三条链路：import map 能否解析 three 与 mind-ar、
+        特征提取器能否加载、编译 Worker 能否真正跑起来。改完对依赖有影响的代码后先看这里。
+      </p>
+      <div id="out"></div>
+    </main>
+
+    <script type="module">
+      const out = document.getElementById("out");
+      const results = [];
+
+      const log = (name, ok, detail) => {
+        results.push({ name, ok, detail });
+        const cls = ok === null ? "notice--info" : ok ? "notice--ok" : "notice--error";
+        const mark = ok === null ? "…" : ok ? "PASS" : "FAIL";
+        out.insertAdjacentHTML(
+          "beforeend",
+          `<div class="notice ${cls}"><strong>${mark}</strong> ${name}` +
+            (detail ? `<br><span style="font-family:var(--mono);font-size:12px">${detail}</span>` : "") +
+            `</div>`
+        );
+        window.__DIAG__ = results;
+      };
+
+      // 0. Cache provenance. A stale cached module looks exactly like a broken one, and the
+      //    resulting debugging session is a waste of everyone's time. These hashes make the
+      //    question factual: if the hash does not match what the server is serving, the
+      //    browser is holding an old copy and the fix is a hard reload, not a code change.
+      try {
+        const shortHash = async (url) => {
+          const res = await fetch(url, { cache: "no-store" });
+          if (!res.ok) return `HTTP ${res.status}`;
+          const bytes = new Uint8Array(await res.arrayBuffer());
+          const digest = await crypto.subtle.digest("SHA-256", bytes);
+          const hex = [...new Uint8Array(digest)]
+            .slice(0, 6)
+            .map((b) => b.toString(16).padStart(2, "0"))
+            .join("");
+          return `${hex} (${bytes.length}B)`;
+        };
+        const watched = [
+          "/vendor/mindar-extract/extract.js",
+          "/js/ar/precheck.js",
+          "/js/ar/mind-compile.js",
+          "/js/ar/mind-compile.worker.js",
+          "/vendor/mindar-image-three.prod.js",
+        ];
+        const lines = [];
+        let allOk = true;
+        for (const url of watched) {
+          const res = await fetch(url, { cache: "no-store" });
+          const hash = await shortHash(url);
+          if (!res.ok) allOk = false;
+          lines.push(`${url} -> ${hash}`);
+        }
+        // The exact first line of the vendored extractor is a direct tell: the fixed copy
+        // imports "./cumsum.js", the broken one imported "../utils/cumsum.js".
+        const extractText = await (
+          await fetch("/vendor/mindar-extract/extract.js", { cache: "no-store" })
+        ).text();
+        const firstImport = /import[^\n]*/.exec(extractText)?.[0] ?? "(no import found)";
+        const importFixed = firstImport.includes('"./cumsum.js"');
+        log(
+          "server is serving the current vendor files",
+          allOk && importFixed,
+          lines.join("<br>") +
+            `<br>extract.js first import: ${firstImport.replace(/</g, "&lt;")}` +
+            (importFixed ? "" : "<br><strong>stale: the server copy still has the old import path</strong>")
+        );
+      } catch (err) {
+        log("server is serving the current vendor files", false, String(err));
+      }
+
+      // 1. three via the compatibility shim.
+      try {
+        const three = await import("three");
+        const missing = ["Scene", "Group", "Quaternion", "WebGLRenderer", "Vector3", "Matrix4"];
+        const absent = missing.filter((n) => !(n in three));
+        log(
+          "import 'three' resolves (compat shim)",
+          absent.length === 0,
+          `REVISION=${three.REVISION} sRGBEncoding=${three.sRGBEncoding} missing=${absent.join(",") || "none"}`
+        );
+      } catch (err) {
+        log("import 'three' resolves (compat shim)", false, String(err));
+      }
+
+      // 2. mind-ar's render bundle, which is what the AR page needs.
+      try {
+        const mod = await import("mindar-image-three");
+        log(
+          "import 'mindar-image-three' resolves",
+          typeof mod.MindARThree === "function",
+          `exports=${Object.keys(mod).join(",")}`
+        );
+      } catch (err) {
+        log("import 'mindar-image-three' resolves", false, String(err));
+      }
+
+      // Cache-buster for the checks whose modules changed most recently. A diagnostic that
+      // can be fooled by the browser cache is not a diagnostic: without this, a stale entry
+      // reports a failure that no longer exists in the code.
+      const bust = `?v=${Date.now()}`;
+
+      // 3. the standalone feature extractor used by the pre-check.
+      try {
+        const mod = await import(`/vendor/mindar-extract/extract.js${bust}`);
+        log(
+          "vendored feature extractor loads",
+          typeof mod.extract === "function",
+          `exports=${Object.keys(mod).join(",")}`
+        );
+      } catch (err) {
+        log("vendored feature extractor loads", false, String(err));
+      }
+
+      // 4. the pre-check itself, on synthesised images with known ground truth.
+      try {
+        const { precheckImage, measureTrackability } = await import(`/js/ar/precheck.js${bust}`);
+
+        /**
+         * Build a synthetic image with PHOTO-LIKE structure.
+         *
+         * Getting this wrong is easy and instructive. An earlier version filled the canvas
+         * with per-pixel random black/white noise and expected it to pass -- it measured
+         * ZERO features. The reason: the extractor looks at the image downscaled to a 256px
+         * short side, so each output pixel is a box average of several source pixels, and the
+         * average of independent random samples converges on mid-grey. High-frequency noise
+         * is therefore erased by the very first step of the pipeline.
+         *
+         * What survives downscaling is structure: blobs, edges and regions that stay distinct
+         * at ~256px. That is also what a real photograph has, which is why real photos score
+         * in the 40s while both random noise and regular lattices score zero.
+         */
+        const makeStructuredImage = (width, height) => {
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+
+          // Mid-grey base, so neither polarity dominates.
+          ctx.fillStyle = "#808080";
+          ctx.fillRect(0, 0, width, height);
+
+          // Blobs of varied polarity and size: these become stable corners and edges.
+          let seed = 987654321;
+          const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+          for (let i = 0; i < 90; i++) {
+            const r = 8 + rnd() * 46;
+            const shade = rnd() < 0.5 ? 10 + rnd() * 50 : 200 + rnd() * 50;
+            ctx.beginPath();
+            ctx.arc(rnd() * width, rnd() * height, r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
+            ctx.fill();
+          }
+
+          // A few hard-edged bars: unambiguous straight edges survive every scale.
+          ctx.fillStyle = "#101010";
+          ctx.fillRect(width * 0.08, 0, width * 0.05, height);
+          ctx.fillRect(0, height * 0.82, width, height * 0.06);
+          ctx.fillStyle = "#f0f0f0";
+          ctx.fillRect(width * 0.62, 0, width * 0.06, height * 0.48);
+
+          return canvas;
+        };
+
+        const good = makeStructuredImage(600, 450);
+        const goodVerdict = await precheckImage(good);
+        log(
+          "pre-check passes a photo-like structured image",
+          goodVerdict.ok === true,
+          `minPoints=${goodVerdict.metrics?.minPoints} counts=${goodVerdict.metrics?.pointCounts}`
+        );
+
+        // Report the actual noise behaviour rather than asserting a guess about it, so the
+        // threshold in precheck.js can be calibrated against evidence.
+        const noise = document.createElement("canvas");
+        noise.width = 600;
+        noise.height = 450;
+        {
+          const ctx = noise.getContext("2d");
+          const image = ctx.createImageData(noise.width, noise.height);
+          for (let i = 0; i < image.data.length; i += 4) {
+            const v = Math.random() < 0.5 ? 0 : 255;
+            image.data[i] = image.data[i + 1] = image.data[i + 2] = v;
+            image.data[i + 3] = 255;
+          }
+          ctx.putImageData(image, 0, 0);
+        }
+        const noiseGrey = (() => {
+          const ctx = noise.getContext("2d", { willReadFrequently: true });
+          const rgba = ctx.getImageData(0, 0, noise.width, noise.height).data;
+          const grey = new Uint8Array(noise.width * noise.height);
+          for (let i = 0, p = 0; i < grey.length; i++, p += 4) {
+            grey[i] = (rgba[p] + rgba[p + 1] + rgba[p + 2]) / 3;
+          }
+          return grey;
+        })();
+        const noiseMetrics = measureTrackability(noiseGrey, noise.width, noise.height);
+        log(
+          "per-pixel noise yields no features (downscaling averages it to flat grey)",
+          noiseMetrics.minPoints === 0,
+          `minPoints=${noiseMetrics.minPoints} counts=${noiseMetrics.pointCounts} ` +
+            `-- this is why a heavily noised or extremely high-frequency photo can fail`
+        );
+
+        // Flat grey: must be rejected (this is the case a naive heuristic gets wrong).
+        const flat = document.createElement("canvas");
+        flat.width = 480;
+        flat.height = 360;
+        {
+          const ctx = flat.getContext("2d");
+          ctx.fillStyle = "#8a8a8a";
+          ctx.fillRect(0, 0, flat.width, flat.height);
+        }
+        const flatVerdict = await precheckImage(flat);
+        log(
+          "pre-check rejects a flat image",
+          flatVerdict.ok === false && flatVerdict.code === "no-features",
+          `code=${flatVerdict.code} minPoints=${flatVerdict.metrics?.minPoints}`
+        );
+
+        // Perfect checkerboard: high contrast AND high edge count, yet mind-ar discards
+        // every point as self-similar. This is the case that justifies using mind-ar's
+        // real extractor instead of a proxy heuristic.
+        const checker = document.createElement("canvas");
+        checker.width = 480;
+        checker.height = 360;
+        {
+          const ctx = checker.getContext("2d");
+          for (let y = 0; y < checker.height; y += 16) {
+            for (let x = 0; x < checker.width; x += 16) {
+              ctx.fillStyle = ((x >> 4) + (y >> 4)) % 2 ? "#f0f0f0" : "#101010";
+              ctx.fillRect(x, y, 16, 16);
+            }
+          }
+        }
+        const checkerVerdict = await precheckImage(checker);
+        log(
+          "pre-check rejects a regular checkerboard (self-similarity suppression)",
+          checkerVerdict.ok === false,
+          `code=${checkerVerdict.code} minPoints=${checkerVerdict.metrics?.minPoints}`
+        );
+      } catch (err) {
+        log("pre-check runs", false, String(err));
+      }
+
+      // 5. the compile worker end to end. This is the heaviest and most fragile link:
+      //    a module Worker + a bare-specifier dynamic import resolved by the page's import map.
+      try {
+        const { compileTarget } = await import("/js/ar/mind-compile.js");
+
+        const canvas = document.createElement("canvas");
+        canvas.width = 600;
+        canvas.height = 450;
+        {
+          const ctx = canvas.getContext("2d");
+          // Structured, irregular content: blobs plus noise, no repeating lattice.
+          ctx.fillStyle = "#202020";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          for (let i = 0; i < 400; i++) {
+            ctx.beginPath();
+            ctx.arc(
+              Math.random() * canvas.width,
+              Math.random() * canvas.height,
+              6 + Math.random() * 34,
+              0,
+              Math.PI * 2
+            );
+            const shade = Math.floor(Math.random() * 255);
+            ctx.fillStyle = `rgb(${shade},${shade},${shade})`;
+            ctx.fill();
+          }
+        }
+        const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+
+        const t0 = performance.now();
+        let sawProgress = false;
+        const compiled = await compileTarget(blob, () => {
+          sawProgress = true;
+        });
+        const ms = Math.round(performance.now() - t0);
+
+        log(
+          "compile worker produces a .mind",
+          compiled.bytes instanceof Uint8Array && compiled.bytes.length > 1000,
+          `${compiled.bytes.length} bytes, ${ms}ms, trackingPoints=${compiled.trackingPoints}, scales=${compiled.matchingScales}`
+        );
+        log(
+          "compile worker reports progress",
+          sawProgress,
+          `sawProgress=${sawProgress}`
+        );
+        log(
+          "compiled target is loadable by the tracker",
+          compiled.matchingScales > 0 && compiled.trackingPoints.some((p) => p > 0),
+          `matchingScales=${compiled.matchingScales} trackingPoints=${compiled.trackingPoints}`
+        );
+
+        // 6. round-trip the compiled payload through the AR tracker's own parser.
+        try {
+          const { Controller } = await import("mindar-image-compile");
+          const controller = new Controller({ inputWidth: 640, inputHeight: 480 });
+          const parsed = controller.addImageTargetsFromBuffer(compiled.bytes.buffer);
+          log(
+            "tracker parses the compiled target",
+            Array.isArray(parsed?.dimensions) && parsed.dimensions.length === 1,
+            `dimensions=${JSON.stringify(parsed?.dimensions)}`
+          );
+        } catch (err) {
+          log("tracker parses the compiled target", false, String(err));
+        }
+      } catch (err) {
+        log("compile worker produces a .mind", false, String(err));
+      }
+
+      // 6. video playback + VideoTexture upload.
+      //
+      // This is the check that matters when the AR screen appears but stays black: it separates
+      // "the video element never decoded" from "the video decoded but the GPU texture was never
+      // uploaded". Counting non-black pixels in a real render is the only way to tell those
+      // apart from the outside.
+      try {
+        const THREE = await import("three");
+
+        // Render a test pattern into a canvas and encode it as a webm/mp4 the browser can play.
+        const src = document.createElement("canvas");
+        src.width = 320;
+        src.height = 180;
+        {
+          const ctx = src.getContext("2d");
+          ctx.fillStyle = "#ff9d2e";
+          ctx.fillRect(0, 0, src.width, src.height);
+          ctx.fillStyle = "#1f6feb";
+          ctx.fillRect(40, 40, 160, 100);
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(220, 30, 70, 70);
+        }
+
+        // encodeVideoFrame() gives a VideoFrame that MediaRecorder can consume without a
+        // real-time capture; fall back to captureStream on browsers that lack it.
+        const stream = src.captureStream ? src.captureStream(10) : null;
+        let videoUrl = null;
+
+        if (stream) {
+          const chunks = [];
+          const recorder = new MediaRecorder(stream, { mimeType: "video/webm" });
+          recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+          const stopped = new Promise((resolve) => (recorder.onstop = resolve));
+          recorder.start();
+          await new Promise((r) => setTimeout(r, 400));
+          recorder.stop();
+          await stopped;
+          videoUrl = URL.createObjectURL(new Blob(chunks, { type: "video/webm" }));
+        }
+
+        if (!videoUrl) {
+          log("video playback check", false, "MediaRecorder/captureStream unavailable in this browser");
+        } else {
+          const video = document.createElement("video");
+          video.src = videoUrl;
+          video.muted = true;
+          video.loop = true;
+          video.playsInline = true;
+          video.setAttribute("playsinline", "");
+          video.setAttribute("muted", "");
+          video.preload = "auto";
+          // Same invisible-but-attached treatment the AR viewer uses.
+          video.style.position = "absolute";
+          video.style.width = "1px";
+          video.style.height = "1px";
+          video.style.opacity = "0";
+          video.style.pointerEvents = "none";
+          document.body.appendChild(video);
+
+          // Wait for metadata, which is what gives videoWidth/videoHeight real values.
+          await new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error("metadata timeout")), 8000);
+            video.addEventListener("loadeddata", () => {
+              clearTimeout(timer);
+              resolve();
+            });
+            video.addEventListener("error", () => {
+              clearTimeout(timer);
+              reject(new Error("video error"));
+            });
+            video.load();
+          });
+
+          log(
+            "test video decodes with real dimensions",
+            video.videoWidth > 0 && video.videoHeight > 0,
+            `${video.videoWidth}x${video.videoHeight} readyState=${video.readyState}`
+          );
+
+          await video.play();
+          await new Promise((r) => setTimeout(r, 600));
+
+          log(
+            "test video is actually playing",
+            !video.paused && video.currentTime > 0,
+            `paused=${video.paused} currentTime=${video.currentTime.toFixed(3)}`
+          );
+
+          // --- the real test: does a VideoTexture reach the GPU? ---
+          const renderer = new THREE.WebGLRenderer({ antialias: false });
+          renderer.setSize(64, 64, false);
+          const scene = new THREE.Scene();
+          const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+          camera.position.z = 1;
+
+          const texture = new THREE.VideoTexture(video);
+          texture.colorSpace = "srgb";
+          const mesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(2, 2),
+            new THREE.MeshBasicMaterial({ map: texture, toneMapped: false })
+          );
+          scene.add(mesh);
+
+          // Force the upload the same way a per-frame refresh would.
+          texture.needsUpdate = true;
+          renderer.render(scene, camera);
+
+          const gl = renderer.getContext();
+          const pixels = new Uint8Array(64 * 64 * 4);
+          gl.readPixels(0, 0, 64, 64, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+          let nonBlack = 0;
+          for (let i = 0; i < pixels.length; i += 4) {
+            if (pixels[i] + pixels[i + 1] + pixels[i + 2] > 24) nonBlack++;
+          }
+          const ratio = nonBlack / (64 * 64);
+
+          log(
+            "VideoTexture reaches the GPU (non-black pixels rendered)",
+            ratio > 0.5,
+            `${(ratio * 100).toFixed(1)}% non-black | texture ${texture.image?.videoWidth ?? "?"}x${texture.image?.videoHeight ?? "?"} | ` +
+              `source canvas was orange/blue so black means the upload failed`
+          );
+
+          renderer.dispose();
+          texture.dispose();
+          video.pause();
+          video.remove();
+          URL.revokeObjectURL(videoUrl);
+        }
+      } catch (err) {
+        log("video playback + texture upload", false, String(err));
+      }
+
+      // 7. VIDEO FILE DIAGNOSTIC
+      //
+      // Point this at a real video that the AR screen refused to play. It tests each layer
+      // separately -- can the bytes be read, is the container understood, does a blob URL from
+      // the raw File load, does a blob URL from a materialised Blob load -- because
+      // `networkState = 3` with no MediaError is ambiguous: it means the browser never even
+      // tried to decode, which points at the source rather than the media.
+      {
+        const panel = document.createElement("div");
+        panel.className = "notice notice--info";
+        panel.innerHTML =
+          `<strong>视频文件诊断</strong><br>` +
+          `<span style="font-size:13px">选择一段在 AR 里无法播放的视频，逐步检查每一层。</span><br>` +
+          `<input id="vprobe" type="file" accept="video/mp4,video/x-m4v,video/*" style="margin-top:8px" />` +
+          `<div id="vprobe-out" style="font-family:var(--mono);font-size:12px;margin-top:8px;white-space:pre-wrap"></div>`;
+        out.appendChild(panel);
+        out.appendChild(document.createElement("br"));
+
+        const fileInput = panel.querySelector("#vprobe");
+        const probeOut = panel.querySelector("#vprobe-out");
+        const say = (line) => {
+          probeOut.textContent += line + "\n";
+        };
+
+        /** Read the first bytes and report the MP4 box layout. */
+        const readHead = async (file) => {
+          const buf = new Uint8Array(await file.slice(0, 4096).arrayBuffer());
+          const view = new DataView(buf.buffer);
+          const brand = String.fromCharCode(buf[4], buf[5], buf[6], buf[7]);
+          const boxes = [];
+          let o = 0;
+          while (o + 8 <= buf.length) {
+            const size = view.getUint32(o);
+            const type = String.fromCharCode(buf[o + 4], buf[o + 5], buf[o + 6], buf[o + 7]);
+            boxes.push(`${type}(${size})`);
+            if (size < 8) break;
+            o += size;
+            if (boxes.length > 4) break;
+          }
+          return { brand, boxes: boxes.join(" ") };
+        };
+
+        /** Attach a video element, then load a given URL. Mirrors what the AR viewer does. */
+        const tryLoad = (url, label) =>
+          new Promise((resolve) => {
+            const v = document.createElement("video");
+            v.muted = true;
+            v.playsInline = true;
+            v.setAttribute("playsinline", "");
+            v.setAttribute("muted", "");
+            v.preload = "auto";
+            v.style.cssText = "position:absolute;width:2px;height:2px;opacity:0;pointer-events:none";
+            document.body.appendChild(v);
+
+            let settled = false;
+            const done = (result) => {
+              if (settled) return;
+              settled = true;
+              clearTimeout(timer);
+              clearInterval(poll);
+              v.pause();
+              v.removeAttribute("src");
+              v.remove();
+              resolve(result);
+            };
+            const timer = setTimeout(
+              () => done({ label, ok: false, why: `timeout rs=${v.readyState} net=${v.networkState}` }),
+              8000
+            );
+            const poll = setInterval(() => {
+              if (v.networkState === 3) {
+                done({
+                  label,
+                  ok: false,
+                  why: `networkState=3 (NO_SOURCE) rs=${v.readyState} error=${v.error ? v.error.code : "none"}`,
+                });
+              }
+            }, 150);
+
+            v.addEventListener("loadeddata", () =>
+              done({
+                label,
+                ok: true,
+                why: `${v.videoWidth}x${v.videoHeight} dur=${Number.isFinite(v.duration) ? v.duration.toFixed(1) : "?"}s`,
+              })
+            );
+            v.addEventListener("error", () =>
+              done({
+                label,
+                ok: false,
+                why: `error event, MediaError code=${v.error?.code ?? "?"} "${v.error?.message ?? ""}"`,
+              })
+            );
+
+            v.src = url;
+            v.load();
+          });
+
+        fileInput.addEventListener("change", async () => {
+          const file = fileInput.files?.[0];
+          if (!file) return;
+          probeOut.textContent = "";
+
+          say(`file      ${file.name}`);
+          say(`size      ${(file.size / 1024 / 1024).toFixed(1)} MB`);
+          say(`type      ${file.type || "(empty)"}`);
+          say(`lastMod   ${new Date(file.lastModified).toISOString()}`);
+
+          // Layer 1: can the bytes be read at all?
+          try {
+            const head = await readHead(file);
+            say(`head      brand=${head.brand} boxes: ${head.boxes}`);
+            say(`L1 read   OK (bytes are accessible)`);
+          } catch (err) {
+            say(`L1 read   FAILED: ${err.message}`);
+          }
+
+          // Layer 2: a blob URL made from the raw File.
+          const rawUrl = URL.createObjectURL(file);
+          say(`blob-url  ${rawUrl}`);
+          const rawResult = await tryLoad(rawUrl, "raw File");
+          say(`L2 raw    ${rawResult.ok ? "OK   " : "FAIL "} ${rawResult.why}`);
+          URL.revokeObjectURL(rawUrl);
+
+          // Layer 3: a blob URL made from a materialised copy.
+          //
+          // These can behave differently. A File from the picker may be a lazy handle into a
+          // provider (iCloud Drive, Photos) that does not stream; reading it into an ArrayBuffer
+          // forces the data local, and a Blob built from those bytes is a plain in-memory object.
+          try {
+            const bytes = await file.arrayBuffer();
+            say(`L3 read   arrayBuffer OK (${(bytes.byteLength / 1024 / 1024).toFixed(1)} MB in memory)`);
+            const copyUrl = URL.createObjectURL(new Blob([bytes], { type: "video/mp4" }));
+            const copyResult = await tryLoad(copyUrl, "materialised Blob");
+            say(`L3 copy   ${copyResult.ok ? "OK   " : "FAIL "} ${copyResult.why}`);
+            URL.revokeObjectURL(copyUrl);
+          } catch (err) {
+            say(`L3 read   FAILED: ${err.message}`);
+          }
+
+          say("");
+          say("判读：");
+          say("  L2 失败 + L3 成功  -> File 句柄是懒加载的，需要先读进内存（我据此改代码）");
+          say("  L2/L3 都失败       -> 这台设备/浏览器不接受这个容器，需要转码");
+          say("  L1 失败            -> 文件读取权限问题（iCloud 未下载完？）");
+          void bust;
+        });
+
+        window.__VIDEO_PROBE_READY__ = true;
+      }
+
+      const failed = results.filter((r) => r.ok === false).length;
+      out.insertAdjacentHTML(
+        "beforeend",
+        `<div class="notice ${failed ? "notice--error" : "notice--ok"}">` +
+          `<strong>${failed ? failed + " 项失败" : "全部通过"}</strong>（共 ${results.length} 项）</div>`
+      );
+      window.__DIAG_DONE__ = true;
+    </script>
+  </body>
+</html>

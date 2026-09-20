@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#080a0f" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>解码能力诊断 · CardVideo</title>
+    <link rel="stylesheet" href="/css/base.css" />
+  </head>
+
+  <body>
+    <div class="topbar">
+      <span class="brand">Card<span>Video</span></span>
+      <span class="hint">解码能力诊断</span>
+    </div>
+
+    <main class="wrap">
+      <h1>这台浏览器能解码音频吗？</h1>
+      <p>
+        这个页面用<strong>浏览器自己录制的音频</strong>来验证解码能力，不依赖任何外部文件。
+        它回答一个具体问题：如果 AR 里没有声音，是这台浏览器的问题，还是别的环节。
+      </p>
+
+      <button id="run" class="btn" type="button" style="margin-bottom: 16px">开始诊断</button>
+      <div id="out"></div>
+
+      <div class="panel panel--tight">
+        <p class="hint" style="margin: 0">
+          请把 <strong>userAgent</strong> 和<strong>「播放浏览器自己录制的音频」</strong>那一条发我。
+        </p>
+      </div>
+    </main>
+
+    <script type="module">
+      const script = document.createElement("script");
+      script.type = "module";
+      script.src = `/js/codec-test.js?v=${Date.now()}`;
+      document.head.appendChild(script);
+    </script>
+  </body>
+</html>

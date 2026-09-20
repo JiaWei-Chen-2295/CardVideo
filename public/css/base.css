@@ -1,0 +1,370 @@
+/* CardVideo shared styles.
+ *
+ * Design intent: the AR view is the product, so every other screen stays quiet and gets
+ * out of the way. Dark surfaces throughout, because the camera feed is bright and a light
+ * UI around it is tiring to look at. */
+
+:root {
+  color-scheme: dark;
+
+  --bg: #080a0f;
+  --surface: #12161f;
+  --surface-2: #1a2029;
+  --border: #262d3a;
+  --text: #e8eef8;
+  --text-dim: #97a3b6;
+  --text-faint: #6b7688;
+
+  --accent: #4c8dff;
+  --accent-strong: #2f72e8;
+  --danger: #ff5d5d;
+  --warn: #ffb547;
+  --ok: #42d392;
+
+  --radius: 14px;
+  --radius-sm: 9px;
+
+  --font: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+    "Microsoft YaHei", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+  margin: 0 0 0.6em;
+  font-weight: 650;
+}
+
+p {
+  line-height: 1.65;
+  color: var(--text-dim);
+  margin: 0 0 1em;
+}
+
+code,
+pre {
+  font-family: var(--mono);
+  font-size: 0.86em;
+}
+
+/* ------------------------------------------------------------------- layout */
+
+.wrap {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 18px 64px;
+}
+
+.wrap--narrow {
+  max-width: 460px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.brand span {
+  color: var(--accent);
+}
+
+/* ---------------------------------------------------------------------- card */
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.panel--tight {
+  padding: 14px;
+}
+
+/* -------------------------------------------------------------------- buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 15px 18px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 650;
+  font-size: 16px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn--ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.btn--ghost:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+
+.btn--danger {
+  background: transparent;
+  border: 1px solid rgba(255, 93, 93, 0.45);
+  color: var(--danger);
+}
+.btn--danger:hover:not(:disabled) {
+  background: rgba(255, 93, 93, 0.1);
+}
+
+.btn--sm {
+  width: auto;
+  padding: 9px 14px;
+  font-size: 14px;
+}
+
+/* --------------------------------------------------------------------- forms */
+
+.field {
+  margin-bottom: 16px;
+}
+
+.label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin-bottom: 7px;
+}
+
+input[type="text"],
+input[type="file"] {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+}
+
+input[type="file"] {
+  padding: 10px;
+  cursor: pointer;
+}
+
+input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ------------------------------------------------------------------- notices */
+
+.notice {
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  margin-bottom: 14px;
+  border: 1px solid transparent;
+}
+
+.notice--info {
+  background: rgba(76, 141, 255, 0.1);
+  border-color: rgba(76, 141, 255, 0.3);
+  color: #bcd3ff;
+}
+.notice--ok {
+  background: rgba(66, 211, 146, 0.1);
+  border-color: rgba(66, 211, 146, 0.3);
+  color: #b6f0d5;
+}
+.notice--warn {
+  background: rgba(255, 181, 71, 0.1);
+  border-color: rgba(255, 181, 71, 0.32);
+  color: #ffe0ac;
+}
+.notice--error {
+  background: rgba(255, 93, 93, 0.1);
+  border-color: rgba(255, 93, 93, 0.32);
+  color: #ffc4c4;
+}
+
+/* -------------------------------------------------------------------- status */
+
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.step {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 9px 0;
+  font-size: 14px;
+  color: var(--text-faint);
+  border-bottom: 1px solid rgba(38, 45, 58, 0.6);
+}
+.step:last-child {
+  border-bottom: 0;
+}
+
+.step__dot {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.step[data-state="active"] {
+  color: var(--text);
+}
+.step[data-state="active"] .step__dot {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.step[data-state="done"] {
+  color: var(--text-dim);
+}
+.step[data-state="done"] .step__dot {
+  border-color: var(--ok);
+  background: var(--ok);
+  color: #04231a;
+}
+.step[data-state="error"] {
+  color: var(--danger);
+}
+.step[data-state="error"] .step__dot {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: hidden;
+  margin: 10px 0 4px;
+}
+
+.progress__bar {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.2s ease;
+}
+
+/* ------------------------------------------------------------------ readout */
+
+.kv {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  font-size: 13px;
+  font-family: var(--mono);
+}
+.kv dt {
+  color: var(--text-faint);
+}
+.kv dd {
+  margin: 0;
+  color: var(--text-dim);
+  word-break: break-all;
+}
+
+.thumb {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  display: block;
+  background: var(--surface-2);
+}
+
+.hint {
+  font-size: 13px;
+  color: var(--text-faint);
+  line-height: 1.6;
+}
+
+.spinner {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  border-top-color: #fff;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2s;
+  }
+}
