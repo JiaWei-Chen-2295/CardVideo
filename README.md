@@ -176,9 +176,60 @@ npm run check:deploy
 
 | 检查 | 为什么重要 |
 |---|---|
+| `check:entrypoints` | 入口文件是否存在、**`api/` 处理器是否被 `vercel.json` 重写挂上**、两种 URL 形态是否都能打到 API |
 | `check:production` | 以 `VERCEL=1` 导入应用：验证 default export、静态资源、**`/media/` 未被挂载**、应用不自行监听端口 |
 | `check:storage` | 凭证格式、**密钥查重**、**CORS 预检逐头验证**、预签名上传、读取、删除 |
 | `check:turso` | 连接、建表、字段映射、类型、删除 |
+
+部署之后还要问一次**线上**——本地检查再全也发现不了下面这个故障：
+
+```bash
+npm run check:live        # 默认 https://card.javierchen.cn，也可 npm run check:live -- <url>
+```
+
+它验证函数**真的在被调用**，而不只是构建成功。
+
+### ⚠️ 入口文件：根目录 `server.js` 不够，必须放在 `api/`
+
+**这里踩过一次真实的坑，症状完全没有报错。** 按官方文档在根目录放了 `server.js` 转出应用，部署"成功"、页面全部正常，但**整个 API 从未被调用**：
+
+| 线上实际返回 | 应该是 |
+|---|---|
+| `GET /api/health` → `200 text/html`（首页文档） | `200 application/json` |
+| `GET /任意不存在的路径` → `200 text/html`（首页） | `404 JSON` |
+| `POST /api/*` → `405` 空 body | `400 JSON` |
+
+整站被当成**纯静态包**发布了，`public/` 里的文件在 CDN 上直接发，`/api/*` 找不到文件就回落首页，POST 打静态文件被 Vercel 拒为 405。**构建日志里一个字都没有。**
+
+而根目录 `server.js` 是官方文档写的位置，`check:entrypoints` 当时也全绿——它验证了文件存在且导出正确，但**没有任何本地检查能发现"这个文件没被打包进去"**。
+
+所以函数入口放在 **`api/`** —— Vercel 唯一无需推断框架、一定当作 serverless function 的目录：
+
+```
+api/index.js          ← default export 一个 (req, res) handler，转发给 Express app
+vercel.json           ← rewrites: /api/:path* -> /api
+```
+
+`api/index.js` 会**归一化路径**，因为重写过来时 `/api` 前缀是保留还是被剥掉没有明确文档。两种形态都必须能命中，`check:entrypoints` 对两种都做了断言。
+
+> 这也解释了你最初看到的那条报错：`The pattern "server/index.js" defined in functions doesn't match any Serverless Functions inside the api directory` —— Vercel 的 `functions` 只认 `api/` 目录。当时我删掉了 `functions` 块，但**没有把文件放进 `api/`**，等于只解决了一半。
+
+### ⚠️ 本机代理会让线上看起来是坏的
+
+```bash
+npm run check:live
+```
+
+在这台机器上，Clash 之类的代理开着 fake-IP 模式时，会把 `card.javierchen.cn` 解析到 `198.18.0.0/15` 保留网段（实测 `198.18.0.225`），于是**所有请求由代理回答而不是 Vercel**。
+
+这正是本次排查的起点：浏览器里 `POST /api/upload-ticket` 显示 `405`、远程地址 `127.0.0.1:7897`——那个 405 是**本地代理**回的。同一个域名，走 Node 直连拿到的才是真实结果：
+
+```
+A 记录（DoH 查询）: 64.29.17.1 / 216.198.79.65     ← 真实 Vercel IP
+NS:                ns1.vercel-dns.com
+```
+
+`check:live` 用 Node 的 `fetch`（走 OpenSSL，不受系统代理和 Windows Schannel 影响）。**看到 405 或证书错误时，先确认是不是代理在中间。**
 
 ### ⚠️ Vercel 上与本地不同的两点
 
@@ -186,11 +237,7 @@ npm run check:deploy
 
 所以 `server/index.js` 里那套基于 `setHeaders` 的缓存策略**在生产上不起作用**，同样的策略以 `headers` 规则写在 `vercel.json` 里。**两处必须保持一致**，否则本地正常的缓存行为上线后会变——而缓存行为错了，表现是"改了代码但浏览器跑旧的"。
 
-**② 入口文件位置有约束。** Vercel 只在**根目录**或 `src/` 下寻找 `app|index|server.{js,mjs,cjs,...}` 并要求 default export。本项目入口是 `server/index.js`，而 `server/` 不在它的扫描目录里。若零配置模式没识别到入口，在根目录建 `server.js`：
-
-```js
-export { default } from "./server/index.js";
-```
+**② 入口文件见上一节。** 结论是：不要依赖根目录的零配置探测，把 handler 放进 `api/` 并用 `rewrites` 显式挂上。
 
 ### 流量成本提醒
 
@@ -227,8 +274,11 @@ npm run check          # 三套检查全跑
 | `npm run check:server` | 端到端 API：上传凭证、直传、建卡、读取、Range 请求、删除鉴权、路径穿越、跨卡片 key 攻击 |
 | `npm run check:storage` | **对象存储真实连通**：凭证格式、密钥是否填重、CORS 预检、预签名上传、公开读取、删除 |
 | `npm run check:turso` | **数据库真实连通**：连接、建表、建卡/读卡/字段比对/删除 |
+| `npm run check:live` | **线上真的在跑函数**（而不只是静态文件）：`/api/health` 必须是 JSON、必须报告 `storage=s3` 与 `cards=turso`、其余 API 路径必须可达 |
 
-后两项需要 `.env`，并会真的读写云端资源（用完即删）。
+`check:live` 是唯一一个**必须部署之后才能跑**的检查，也是唯一能发现"构建成功但函数没接上"的检查——本地代码在那种情况下是完全正确的。详见[入口文件](#️-入口文件根目录-serverjs-不够必须放在-api)。
+
+`storage` 与 `turso` 两项需要 `.env`，并会真的读写云端资源（用完即删）；`check:live` 不需要凭证。
 
 ### 对象存储的坑（都已在检查脚本里固化）
 
@@ -305,11 +355,16 @@ node scripts/fix-video.mjs "你的视频.mp4"            # 只重编码音频、
 ## 项目结构
 
 ```
+api/
+  index.js              Vercel 真正调用的函数入口；归一化路径后转发给 Express app
+
+server.js               根目录零配置入口；与 api/index.js 导出同一个 app 实例
+
 server/
   index.js              Express 应用；同时导出 app 供 Vercel 包装
   lib/config.js         决策常量（阈值、验收标准）与 id/错误工具
   lib/storage.js        存储适配器：disk（开发）/ 通用 S3（COS、七牛、OSS、R2）
-  lib/cardStore.js      元数据：与媒体同源（对象存储）/ data/cards.json（兜底）
+  lib/cardStore.js      元数据：Turso / data/cards.json（本地兜底）
   lib/mp4.js            手写 MP4 box 解析：改尺寸、时长、编解码器
   routes/api.js         上传凭证、建卡、读取、删除（含鉴权与 key 归属校验）
   routes/media.js       Range 请求支持 + 本地直传端点
@@ -326,6 +381,8 @@ scripts/
   sync-vendor.mjs       复制并打补丁三个依赖产物，生成 import map
   check-three-compat.mjs  依赖符号兼容性检查
   check-frontend.mjs      前端模块图静态验证
+  check-entrypoints.mjs   入口契约：api/ 处理器 + rewrites + 两种 URL 形态
+  check-live.mjs          线上冒烟：函数是否真的在被调用
   smoke-test.mjs          端到端 API 测试
   gen-fixtures.mjs        生成测试照片与视频
 ```
