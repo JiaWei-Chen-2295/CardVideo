@@ -23,7 +23,9 @@
     "check:turso": "node --env-file=.env scripts/check-turso.mjs",
     "check:storage": "node --env-file=.env scripts/check-storage.mjs",
     "check:production": "node --env-file=.env scripts/check-production.mjs",
-    "check:deploy": "npm run check:production && npm run check:storage && npm run check:turso",
+    "check:entrypoints": "node --env-file=.env scripts/check-entrypoints.mjs",
+    "check:secrets": "node --env-file=.env scripts/check-secrets.mjs",
+    "check:deploy": "npm run check:entrypoints && npm run check:production && npm run check:storage && npm run check:turso",
     "check": "npm run check:three && npm run check:frontend && npm run check:server"
   },
   "dependencies": {

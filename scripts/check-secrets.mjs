@@ -23,28 +23,34 @@ const report = (file, line, what) => {
   console.log(`  LEAK  ${file}${line ? `:${line}` : ""}  ${what}`);
 };
 
-/** Files Git would commit: staged if anything is staged, otherwise everything not ignored. */
-function trackedFiles() {
+/**
+ * Every file that is, or is about to become, part of the repository.
+ *
+ * WHY NOT "the staged diff"
+ * An earlier version scanned `git diff --cached` when anything was staged, and fell back to the full
+ * listing otherwise. That produced two wrong answers on the second commit: it missed untracked new
+ * files (which a plain `git add -A` would have swept in), and it reported `.env.example` as "not
+ * being committed" -- because files already in the repository do not appear in a staged diff.
+ *
+ * `ls-files --cached --others --exclude-standard` is the complete set: everything tracked, plus
+ * everything untracked that is not ignored. That is exactly what the repository contains after a
+ * commit, which is the question worth asking.
+ */
+function repositoryFiles() {
   try {
-    const staged = execFileSync("git", ["diff", "--cached", "--name-only"], { encoding: "utf8" })
-      .split("\n")
-      .filter(Boolean);
-    if (staged.length) return { files: staged, source: "staged" };
-
-    const all = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
+    return execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
       encoding: "utf8",
     })
       .split("\n")
       .filter(Boolean);
-    return { files: all, source: "would-be-committed" };
   } catch (err) {
     console.error("git is not usable:", err.message);
     process.exit(2);
   }
 }
 
-const { files, source } = trackedFiles();
-console.log(`\nsecret scan: ${files.length} file(s) (${source})\n`);
+const files = repositoryFiles();
+console.log(`\nsecret scan: ${files.length} file(s) tracked or about to be tracked\n`);
 
 // --------------------------------------------------------- forbidden paths
 

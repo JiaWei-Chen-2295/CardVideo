@@ -4,12 +4,6 @@
   "installCommand": "npm install --ignore-scripts",
   "buildCommand": "node scripts/sync-vendor.mjs",
   "cleanUrls": true,
-  "functions": {
-    "server/index.js": {
-      "memory": 1024,
-      "maxDuration": 30
-    }
-  },
   "headers": [
     {
       "source": "/vendor/(.*)",
