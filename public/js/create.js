@@ -36,6 +36,8 @@ const els = {
   result: document.getElementById("result"),
   shareUrl: document.getElementById("share-url"),
   copy: document.getElementById("copy"),
+  materialUrl: document.getElementById("material-url"),
+  copyMaterial: document.getElementById("copy-material"),
   selfcheck: document.getElementById("selfcheck"),
   manage: document.getElementById("manage"),
   deleteBtn: document.getElementById("delete-card"),
@@ -253,6 +255,9 @@ async function generate(event) {
 
     const shareUrl = `${location.origin}/c/${cardId}`;
     els.shareUrl.value = shareUrl;
+    // Same card, minimal landing page. Derived from the share URL rather than built separately
+    // so the two can never drift apart.
+    els.materialUrl.value = shareUrl.replace("/c/", "/m/");
 
     // Self-check re-selects the same two files rather than receiving them from here: passing a
     // video between pages would mean persisting it in browser storage, which is fragile and
@@ -289,16 +294,28 @@ async function generate(event) {
 
 els.form.addEventListener("submit", generate);
 
-els.copy.addEventListener("click", async () => {
-  try {
-    await navigator.clipboard.writeText(els.shareUrl.value);
-    els.copy.textContent = "已复制";
-    setTimeout(() => (els.copy.textContent = "复制"), 1500);
-  } catch {
-    // Clipboard access can be denied; selecting the text is a fine fallback.
-    els.shareUrl.select();
-  }
-});
+/**
+ * Wire a "copy this field" button.
+ *
+ * `textContent` is read instead of hard-coded so the restored label always matches whatever
+ * the markup says -- the two links have different labels.
+ */
+function wireCopy(button, input) {
+  button.addEventListener("click", async () => {
+    const label = button.textContent.trim();
+    try {
+      await navigator.clipboard.writeText(input.value);
+      button.textContent = "已复制";
+      setTimeout(() => (button.textContent = label), 1500);
+    } catch {
+      // Clipboard access can be denied; selecting the text is a fine fallback.
+      input.select();
+    }
+  });
+}
+
+wireCopy(els.copy, els.shareUrl);
+wireCopy(els.copyMaterial, els.materialUrl);
 
 els.deleteBtn.addEventListener("click", async () => {
   const { cardId, ownerToken } = els.deleteBtn.dataset;

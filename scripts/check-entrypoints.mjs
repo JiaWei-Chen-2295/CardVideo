@@ -125,22 +125,24 @@ try {
     api ? `${api.source} -> ${api.destination}` : "no rewrite matches /api/"
   );
 
-  // The share link goes through the FUNCTION, not to the static card.html. Rewriting to
+  // Both landing pages go through the FUNCTION, not to a static card.html. Rewriting to
   // `/card.html` was tried and silently did nothing: with `cleanUrls: true` that path is a
   // redirect (`308 -> /card`), so the rewrite was not honoured and /c/<id> kept falling
   // back to public/index.html -- answering 200 text/html with the wrong page.
-  const share = rewrites.find((r) => /^\/c\//.test(r.source));
-  check(
-    "vercel.json rewrites /c/* onto the handler",
-    Boolean(share),
-    share ? `${share.source} -> ${share.destination}` : "no rewrite matches /c/"
-  );
-  if (share) {
+  for (const prefix of ["/c/", "/m/"]) {
+    const share = rewrites.find((r) => r.source.startsWith(prefix));
     check(
-      "the share-link rewrite avoids .html destinations",
-      !share.destination.endsWith(".html"),
-      "cleanUrls turns .html destinations into redirects, which makes the rewrite a no-op"
+      `vercel.json rewrites ${prefix}* onto the handler`,
+      Boolean(share),
+      share ? `${share.source} -> ${share.destination}` : `no rewrite matches ${prefix}`
     );
+    if (share) {
+      check(
+        `the ${prefix} rewrite avoids .html destinations`,
+        !share.destination.endsWith(".html"),
+        "cleanUrls turns .html destinations into redirects, which makes the rewrite a no-op"
+      );
+    }
   }
 } catch (err) {
   check("vercel.json is readable JSON", false, err.message);
@@ -148,12 +150,13 @@ try {
 
 // The share link must be served whether the platform forwards the original path or the
 // rewrite destination, so the app registers it on both. Assert the routes exist rather
-// than trusting that they stay in step.
+// than trusting that they stay in step. `/m/` is the material landing page and follows the
+// same rule for the same reason.
 try {
   const serverJs = readFileSync("server/index.js", "utf8");
-  for (const route of ["/c/:id", "/api/c/:id"]) {
+  for (const route of ["/c/:id", "/api/c/:id", "/m/:id", "/api/m/:id"]) {
     check(
-      `server/index.js serves the card page on ${route}`,
+      `server/index.js serves a landing page on ${route}`,
       serverJs.includes(`app.get("${route}"`),
       "the share link would 404 for whichever path shape the rewrite forwards"
     );
@@ -243,18 +246,24 @@ if (apiHandler) {
     );
   }
 
-  // The share link must serve the card document on BOTH path shapes, because whether the
+  // Both landing pages must serve their document on BOTH path shapes, because whether the
   // rewrite forwards the original path or the destination is not something this project
-  // can rely on. Every wrong answer here is still a 200, so compare the document.
-  for (const path of ["/c/Pw51V7yKPyyZ", "/api/c/Pw51V7yKPyyZ"]) {
+  // can rely on. Every wrong answer here is still a 200, so compare the document -- the
+  // marker is each page's own module, which is what distinguishes them.
+  for (const [path, marker] of [
+    ["/c/Pw51V7yKPyyZ", "/js/card.js"],
+    ["/api/c/Pw51V7yKPyyZ", "/js/card.js"],
+    ["/m/Pw51V7yKPyyZ", "/js/material.js"],
+    ["/api/m/Pw51V7yKPyyZ", "/js/material.js"],
+  ]) {
     const res = await fetch(base + path);
     const html = await res.text();
     const type = res.headers.get("content-type") ?? "";
-    const isCard = type.includes("text/html") && html.includes("/js/card.js");
+    const isLanding = type.includes("text/html") && html.includes(marker);
     const isHomepage = /<title>\s*CardVideo\s*·/.test(html);
     check(
-      `GET ${path} serves the card page`,
-      isCard && !isHomepage,
+      `GET ${path} serves the landing page`,
+      isLanding && !isHomepage,
       isHomepage
         ? "this is the homepage -- the share link fell through to public/index.html"
         : `ct=${type || "(none)"} status=${res.status}`

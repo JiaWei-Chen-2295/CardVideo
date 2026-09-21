@@ -29,6 +29,26 @@ const arViewerModule = import(`/js/ar/ar-viewer.js?v=${Date.now()}`);
 const DEBUG = params.get("debug") === "1";
 let debugPanel = null;
 
+/**
+ * Which landing page handed off to this session.
+ *
+ * `theme=material` means the viewer is already holding a printed piece (MATERIAL.md), so the
+ * generic copy -- "把这张照片打印出来", the three-step list -- describes work they have already
+ * done, and reads as if they skipped a step. Only WORDING branches on this: the audio gesture,
+ * the parallel preload and the 0.8s tracking grace period are untouched, because those are what
+ * make the session work at all.
+ */
+const MATERIAL = params.get("theme") === "material";
+
+// Set at module scope, not when the card resolves: ar.html's static "正在准备…" overlay is
+// already on screen by then, so recolouring it later would flash the generic gradient first.
+// Unhiding the frame here also starts its download in parallel with the .mind and the video,
+// rather than after them -- it is only 124KB, but it is on the same critical path.
+if (MATERIAL) {
+  document.body.dataset.theme = "material";
+  document.getElementById("frame").hidden = false;
+}
+
 function updateDebugPanel(text) {
   if (!DEBUG) return;
   if (!debugPanel) {
@@ -200,10 +220,15 @@ function onViewerState(state) {
 
     case "searching":
       clearEscalate();
-      setHint("把摄像头对准照片", true);
+      setHint(MATERIAL ? "把镜头对准卡片" : "把摄像头对准照片", true);
       // Silence is the worst outcome: after a few seconds of nothing, say what to try.
       escalateTimer = setTimeout(() => {
-        setHint("还没找到照片 · 靠近一点、换个角度、或把光线调亮", false);
+        setHint(
+          MATERIAL
+            ? "还没找到卡片 · 靠近一点、换个角度、把灯打开"
+            : "还没找到照片 · 靠近一点、换个角度、或把光线调亮",
+          false
+        );
       }, ESCALATE_AFTER_MS);
       break;
 
@@ -360,6 +385,15 @@ window.addEventListener("pagehide", () => {
 
   try {
     const source = await resolveSource();
+
+    // 物料版开场：没有可打印的东西，所以不列步骤，只留"标题 + 一句引导 + 一个按钮"。
+    if (MATERIAL) {
+      showOverlay(source.title || "现场", "<p>把镜头对准卡片</p>", {
+        button: { label: "进入现场", action: "start" },
+      });
+      return;
+    }
+
     const steps = [
       "把这张照片<strong>打印出来</strong>（建议 A4 彩打，短边至少 10cm）",
       "光线充足，避免屏幕反光",

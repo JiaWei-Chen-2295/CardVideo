@@ -244,6 +244,13 @@ app.use(express.static(publicDir, {
 app.get("/c/:id", (req, res) => sendPage(res, "card.html"));
 app.get("/api/c/:id", (req, res) => sendPage(res, "card.html"));
 
+// The material landing page. Same card, two front doors: `/c/` is the generic one that has
+// to explain "print this photo out", `/m/` is the minimal one for a viewer who is already
+// holding the printed piece (MATERIAL.md §5). Both paths are served for the same reason as
+// `/c/` above -- on Vercel the rewrite destination cannot be relied on to preserve the path.
+app.get("/m/:id", (req, res) => sendPage(res, "material.html"));
+app.get("/api/m/:id", (req, res) => sendPage(res, "material.html"));
+
 // The AR session and creator pages. These are also reachable as plain .html files via the
 // static middleware above; the extensionless routes exist so share links stay short.
 //

@@ -87,8 +87,21 @@
           <label class="label" for="share-url">分享链接</label>
           <input id="share-url" type="text" readonly />
         </div>
+
+        <div class="field">
+          <label class="label" for="material-url">物料页链接（印二维码用这个）</label>
+          <input id="material-url" type="text" readonly />
+          <p class="hint" style="margin-top: 7px">
+            同一张卡片的极简落地页：没有「请把照片打印出来」那套说明，只有画面、一句引导和一个按钮。
+            印在实物卡片、明信片或海报上时用这条。
+          </p>
+        </div>
+
         <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px">
           <button id="copy" class="btn btn--ghost btn--sm" type="button">复制</button>
+          <button id="copy-material" class="btn btn--ghost btn--sm" type="button">
+            复制物料页链接
+          </button>
           <a id="selfcheck" class="btn btn--sm" href="#" style="width: auto">用我的手机自检一次</a>
         </div>
 

@@ -44,6 +44,19 @@
     <!-- mind-ar injects the camera <video> and its canvases into this element. -->
     <div id="stage" class="ar-stage"></div>
 
+    <!--
+      物料版的取景框：浮在实时摄像头画面之上、所有控件之下的装饰外框。
+      中间整块是抠空的，实时画面从洞里透出来；四角白线留在框上，正好压在实时画面上 ——
+      真取景框就是这样，所以它们没有被一起抠掉。
+
+      只在 theme=material 时由 viewer.js 取消 hidden。默认 hidden 不是"顺便"：
+      背景图在 display:none 的元素上不会被下载，所以通用分享链接不会为它多花 124KB。
+
+      素材由 scripts/frame-alpha.mjs 从 GPT 生成的图里抠出来（中间那块纯色必须被抠掉，
+      否则不透明的底色会把摄像头画面整个盖住）。
+    -->
+    <div id="frame" class="ar-frame" hidden aria-hidden="true"></div>
+
     <div class="ar-chrome">
       <button id="exit" class="ar-exit" type="button" aria-label="退出 AR">
         <span aria-hidden="true">✕</span>

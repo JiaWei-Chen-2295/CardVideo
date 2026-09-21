@@ -25,6 +25,33 @@
   display: none;
 }
 
+/* ---------------------------------------------------------------- 取景框（物料版） */
+
+/* 叠放次序：.ar-stage（无 z-index）< .ar-frame（5）< .ar-chrome（10）< .ar-overlay（20）。
+ *
+ * 必须在 stage 之上：摄像头 <video> 和 WebGL canvas 都注入在 stage 里，而摄像头画面是不透明的，
+ * 放在下面等于什么都看不见。
+ *
+ * 代价要说清楚：升起的视频屏渲染在 stage 的 canvas 里，所以它会从取景框的上下边带**下面**穿过。
+ * 这不是 bug，是真取景框的观感（前景的框压在画面边缘上）；边带做得不宽，正是为了让中景的视频屏
+ * 尽量不撞上它。 */
+.ar-frame {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  pointer-events: none;
+  /* cover 而不是 100% 100%：手机屏的宽高比和素材不一样，拉伸会让四角白线变形。
+     cover 只会裁掉两侧多余的部分。 */
+  background-image: url("/frames/viewfinder.webp");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.ar-frame[hidden] {
+  display: none;
+}
+
 /* --------------------------------------------------------------------- chrome */
 
 .ar-chrome {
@@ -178,6 +205,47 @@
 
 .ar-overlay .btn {
   margin-top: 6px;
+}
+
+/* 物料页（/m/<id>）交接过来的开场屏。
+ *
+ * 那边已经用星空和舞台光建立了氛围，这一屏要接着它，而不是掉回默认的灰蓝渐变。
+ * 唯一的功能性改动是：没有"打印照片"三步，所以内容更少、字号更大、按钮更像一个入口。
+ * 追踪之后的提示条、退出按钮、出错文案全部与通用版共用 —— 那些是出错时唯一的线索，
+ * 不应该因为皮肤不同而少一句。 */
+body[data-theme="material"] .ar-overlay {
+  background: radial-gradient(circle at 50% 42%, #16264f 0%, #0a1024 46%, #05070f 100%);
+}
+
+body[data-theme="material"] .ar-overlay h1 {
+  font-size: 24px;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 26px rgba(76, 141, 255, 0.5);
+}
+
+body[data-theme="material"] .ar-overlay h1 + p {
+  margin-bottom: 22px;
+  color: rgba(238, 244, 255, 0.9);
+}
+
+body[data-theme="material"] .ar-overlay .btn {
+  background: linear-gradient(135deg, #2f6bff 0%, #42c8ff 100%);
+  border-radius: 999px;
+  letter-spacing: 0.14em;
+  text-indent: 0.14em;
+  box-shadow: 0 10px 30px -8px rgba(47, 107, 255, 0.7);
+}
+
+/* 提示条落在取景框下边带的荧光棒海上面，比通用版底下的纯摄像头画面要花，所以底色加厚一档。
+   模糊本身已经由 .ar-hint 的 backdrop-filter 提供，这里只补对比度。 */
+body[data-theme="material"] .ar-hint {
+  background: rgba(6, 10, 22, 0.72);
+  border: 1px solid rgba(120, 170, 255, 0.16);
+}
+
+body[data-theme="material"] .ar-sound {
+  background: rgba(6, 10, 22, 0.78);
+  border-color: rgba(120, 170, 255, 0.2);
 }
 
 .ar-steps {

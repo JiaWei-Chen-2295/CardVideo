@@ -76,7 +76,9 @@ H.264 MP4（需要 ffmpeg）。**照片可以直接打印出来做真机测试�
 | `/create` | 创建卡片：选照片 + 视频 → 预检 → 编译 → 上传 → 拿到分享链接 |
 | `/selfcheck` | 本地自检：**在同一页面内**编译并直接进 AR，不上传任何文件 |
 | `/c/{id}` | 分享落地页：显示照片、打印引导、「开始体验」按钮 |
-| `/ar?card={id}` | AR 观看页（真实卡片） |
+| `/m/{id}` | **物料落地页**：同一张卡片的极简版，只有画面 + 一句引导 + 一个按钮，用于印在实物上的二维码（见 `MATERIAL.md`） |
+| `/ar?card={id}` | AR 观看页（真实卡片）；加 `&theme=material` 换成物料版文案，并套上 `public/frames/viewfinder.webp` 取景框 |
+| `/frames/viewfinder.webp` | 物料版 AR 的取景框浮层（中间抠空，实时画面从洞里透出来）。由 `npm run frame -- --in <生成图>` 从 GPT 生成的图里抠出来，见 `MATERIAL.md` |
 | `/debug.html` | 运行时诊断：验证 import map、特征提取器、编译 Worker 是否正常 |
 | `/codec-test.html` | 解码能力诊断：用浏览器自录音频验证音频解码，排除设备/浏览器问题 |
 
@@ -207,7 +209,7 @@ npm run check:live        # 默认 https://card.javierchen.cn，也可 npm run c
 
 ```
 api/index.js          ← default export 一个 (req, res) handler，转发给 Express app
-vercel.json           ← rewrites: /api/:path* -> /api, /c/:path* -> /api
+vercel.json           ← rewrites: /api/:path* -> /api, /c/:path* -> /api, /m/:path* -> /api
 ```
 
 `api/index.js` 会**归一化路径**，因为重写过来时 `/api` 前缀是保留还是被剥掉没有明确文档。两种形态都必须能命中，`check:entrypoints` 对两种都做了断言。

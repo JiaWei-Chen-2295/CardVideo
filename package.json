@@ -17,6 +17,7 @@
     "fixtures": "node scripts/gen-fixtures.mjs",
     "fix-video": "node scripts/fix-video.mjs",
     "inspect-video": "node scripts/inspect-video.mjs",
+    "frame": "node scripts/frame-alpha.mjs",
     "check:three": "node --no-warnings --experimental-vm-modules scripts/check-three-compat.mjs",
     "check:frontend": "node --no-warnings --experimental-vm-modules scripts/check-frontend.mjs",
     "check:server": "node scripts/smoke-test.mjs",

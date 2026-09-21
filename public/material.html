@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#05070f" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>现场</title>
+    <link rel="stylesheet" href="/css/base.css" />
+    <link rel="stylesheet" href="/css/material.css" />
+    <!--
+      物料页不加载任何 three.js / mind-ar 代码，但 import map 仍然声明：这个页面的
+      脚本和 AR 页面的入口是兄弟文件，将来在这里写一句 `import "three"` 而解析不到
+      bare specifier 会是一个没有任何线索的失败。声明它，成本是零。
+    -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/vendor/three.shim.js",
+          "three/addons/": "/vendor/three-addons/",
+          "mindar-image-three": "/vendor/mindar-image-three.prod.js",
+          "mindar-image-compile": "/vendor/mindar-image-compile.js"
+        }
+      }
+    </script>
+  </head>
+
+  <body class="m">
+    <!-- 纯装饰层。aria-hidden + pointer-events:none，屏幕阅读器和触控都当它不存在。 -->
+    <div class="m-sky" aria-hidden="true">
+      <span class="m-sky__glow m-sky__glow--cool"></span>
+      <span class="m-sky__glow m-sky__glow--warm"></span>
+      <span class="m-sky__beam"></span>
+      <span class="m-sky__stars"></span>
+    </div>
+
+    <main class="m-main">
+      <div id="loading" class="m-loading">
+        <div class="spinner" role="status" aria-label="正在载入"></div>
+      </div>
+
+      <div id="error" class="m-error" hidden></div>
+
+      <section id="content" class="m-content" hidden>
+        <h1 id="title" class="m-title m-fade m-fade--1" hidden></h1>
+
+        <figure class="m-card m-fade m-fade--2">
+          <img id="shot" class="m-card__img" alt="" decoding="async" fetchpriority="high" />
+          <span class="m-card__sheen" aria-hidden="true"></span>
+        </figure>
+
+        <p class="m-lead">把镜头对准卡片</p>
+
+        <a id="enter" class="m-enter m-fade m-fade--3" href="#">进入现场</a>
+
+        <p class="m-tip m-fade m-fade--4">
+          翻到卡片正面 · 保持光线充足<br />
+          打不开摄像头？请点右上角「在浏览器中打开」
+        </p>
+      </section>
+    </main>
+
+    <script type="module" src="/js/material.js"></script>
+  </body>
+</html>

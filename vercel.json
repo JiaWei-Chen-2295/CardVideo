@@ -12,6 +12,10 @@
     {
       "source": "/c/:path*",
       "destination": "/api"
+    },
+    {
+      "source": "/m/:path*",
+      "destination": "/api"
     }
   ],
   "headers": [
